@@ -9,6 +9,7 @@ db_manager.init_db()
 
 REPO_URL = "git@github.com:Rial-2004/DatosColegio.git"
 
+# Template base para mantener el estilo visual
 BASE_HTML = """
 <!DOCTYPE html>
 <html>
@@ -20,8 +21,11 @@ BASE_HTML = """
         .btn { display: inline-block; padding: 12px 24px; margin: 10px; background: #2c3e50; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; }
         .btn-success { background: #27ae60; }
         .btn-github { background: #24292e; }
+        .btn-manage { background: #8e44ad; }
         input { padding: 12px; margin: 10px; width: 300px; border: 1px solid #ddd; border-radius: 6px; }
-        .status-msg { padding: 15px; margin: 20px; border-radius: 8px; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; border: 1px solid #eee; text-align: left; }
+        th { background: #f8f9fa; }
     </style>
 </head>
 <body>
@@ -42,10 +46,63 @@ def index():
             <a href="/grafos" class="btn">📊 B1: Ver Estadísticas</a>
             <a href="/nuevo-alumno" class="btn">📝 B2: Registrar Alumno</a>
             <a href="/github" class="btn btn-github">🐙 B3: Sincronizar GitHub</a>
+            <a href="/listado" class="btn btn-manage">📋 B4: Listado/Gestión</a>
         </div>
     """
     return render_template_string(BASE_HTML, body=contenido)
 
+@app.route('/listado')
+def listado():
+    estudiantes = db_manager.get_all_students()
+    filas = ""
+    for est in estudiantes:
+        filas += f"""
+        <tr>
+            <td>{est['nombre']}</td>
+            <td>{est['localidad']}</td>
+            <td>{est['nota']}</td>
+            <td>
+                <a href="/editar/{est['nombre']}" style="color: #2980b9; margin-right:15px; text-decoration:none;">✏️ Editar</a>
+                <a href="/borrar/{est['nombre']}" style="color: #c0392b; text-decoration:none;" onclick="return confirm('¿Eliminar a {est['nombre']}?')">🗑️ Borrar</a>
+            </td>
+        </tr>
+        """
+    
+    tabla = f"""
+        <h1>Listado de Alumnos</h1>
+        <table>
+            <thead>
+                <tr><th>Nombre</th><th>Localidad</th><th>Nota</th><th>Acciones</th></tr>
+            </thead>
+            <tbody>{filas}</tbody>
+        </table>
+    """
+    return render_template_string(BASE_HTML, body=tabla)
+
+@app.route('/editar/<nombre>', methods=['GET', 'POST'])
+def editar_alumno(nombre):
+    if request.method == 'POST':
+        db_manager.update_student(nombre, request.form['nombre'], request.form['localidad'], request.form['nota'])
+        return redirect(url_for('listado'))
+    
+    est = db_manager.get_student_by_name(nombre)
+    if not est: return redirect(url_for('listado'))
+
+    formulario = f"""
+        <h1>Editar Alumno</h1>
+        <form method="POST">
+            <input type="text" name="nombre" value="{est['nombre']}" required><br>
+            <input type="text" name="localidad" value="{est['localidad']}" required><br>
+            <input type="number" name="nota" value="{est['nota']}" min="0" max="10" required><br>
+            <button type="submit" class="btn btn-success">Guardar Cambios</button>
+        </form>
+    """
+    return render_template_string(BASE_HTML, body=formulario)
+
+@app.route('/borrar/<nombre>')
+def borrar_alumno(nombre):
+    db_manager.delete_student(nombre)
+    return redirect(url_for('listado'))
 @app.route('/grafos')
 def grafos():
     df = pd.DataFrame(db_manager.get_all_students())
